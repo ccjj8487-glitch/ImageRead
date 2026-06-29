@@ -1,0 +1,569 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>발전계획 자동 작성 - 멀티 에디션</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+            word-break: keep-all;
+        }
+        
+        /* 럭셔리 다크 사이버 펑크 테마 배경 */
+        .app-bg {
+            background-color: #030712;
+            background-image: radial-gradient(circle at 50% 0%, #1e1b4b, transparent 50%),
+                              radial-gradient(circle at 0% 100%, #030712, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        /* 👑 천재 김태웅: 헤더에 조화롭게 녹아드는 무지개 그라디언트 텍스트 애니메이션 */
+        @keyframes gradient-move {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .glowing-signature {
+            background: linear-gradient(
+                45deg, 
+                #ff0055, #ffdd00, #00f0ff, #7000ff, #ff0055
+            );
+            background-size: 300% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: gradient-move 4s linear infinite;
+            text-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+        }
+
+        /* 스크롤바 커스텀 */
+        textarea::-webkit-scrollbar { width: 6px; }
+        textarea::-webkit-scrollbar-track { background: transparent; }
+        textarea::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+    </style>
+</head>
+<body class="app-bg text-slate-100 min-h-screen flex flex-col items-center pb-12 antialiased font-sans">
+
+    <header class="w-full max-w-md px-5 py-3.5 flex items-center justify-between sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-white/5 shadow-sm">
+        <div class="flex flex-col">
+            <div class="flex items-center space-x-1.5">
+                <span class="text-xl drop-shadow-md">⚡</span>
+                <h1 class="text-sm font-black tracking-wider text-slate-100 uppercase">발전계획 자동 작성</h1>
+            </div>
+            <span class="text-[10px] text-slate-400 mt-0.5">by <span class="glowing-signature font-extrabold text-[11px]">천재 김태웅</span></span>
+        </div>
+        <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full">GITHUB v4.1</span>
+    </header>
+
+    <main class="w-full max-w-md px-4 mt-5 flex flex-col gap-5">
+
+        <!-- 🔑 보안: API 키 입력 및 로컬 저장 구역 -->
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-lg">
+            <div class="flex justify-between items-center mb-2.5">
+                <label class="text-[11px] font-bold text-blue-400 flex items-center gap-1.5">
+                    <span>🔑</span> 구글 Gemini API 키
+                </label>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[9px] text-emerald-400 hover:text-emerald-300 underline font-semibold">키 무료 발급</a>
+            </div>
+            <div class="flex gap-2">
+                <input type="password" id="apiKeyInput" placeholder="AIzaSy... (여기에 붙여넣기)" class="w-full bg-slate-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono">
+                <button onclick="saveApiKey()" class="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-3 rounded-xl transition-all whitespace-nowrap">저장</button>
+            </div>
+            <p class="text-[9px] text-slate-500 mt-2 leading-relaxed">
+                입력하신 키는 이 기기(스마트폰/PC)의 브라우저에만 안전하게 저장되며, 소스코드나 외부 서버에 노출되지 않습니다.
+            </p>
+        </div>
+
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-1.5 backdrop-blur-lg">
+            <div class="flex items-center space-x-1.5 text-blue-400">
+                <span class="text-xs">💡</span>
+                <h3 class="text-[11px] font-bold uppercase tracking-wider">이용 방법 (대용량 멀티 지원)</h3>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                하루전/신뢰도 사진들을 **원하는 만큼 한꺼번에 선택**해 주세요. (예: 3일치면 6장, 4일치면 8장 등) AI가 자동으로 날짜별 세트를 파악하여 각각의 가공 카드를 생성합니다.
+            </p>
+        </div>
+
+        <section class="bg-white/5 border border-white/10 rounded-3xl p-5 backdrop-blur-lg space-y-4">
+            <div class="flex justify-between items-center border-b border-white/5 pb-3">
+                <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span>📁</span> 사진 일괄 등록 (여러 장 동시 선택)
+                </h3>
+                <span id="fileCountBadge" class="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">0장 선택됨</span>
+            </div>
+
+            <div id="dropZone" class="relative flex flex-col items-center justify-center border border-dashed border-white/15 hover:border-blue-400/50 rounded-2xl p-6 bg-slate-900/30 transition-all cursor-pointer group" onclick="document.getElementById('multiFileInput').click()">
+                <input type="file" id="multiFileInput" accept="image/*" multiple class="hidden" onchange="processMultipleFiles(this.files)">
+                
+                <div id="uploadPrompt" class="text-center space-y-3">
+                    <div class="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto text-blue-400 text-xl group-hover:scale-115 transition-transform">
+                        📸
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-200 font-bold">여기를 눌러 대상 사진들을 한 번에 선택</p>
+                        <p class="text-[10px] text-slate-500 mt-0.5">갤러리에서 여러 개의 사진을 동시에 체크해 주세요</p>
+                    </div>
+                </div>
+
+                <div id="previewArea" class="hidden w-full space-y-3">
+                    <div id="previewGrid" class="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
+                    </div>
+                    <div class="mt-2 text-center">
+                        <span id="previewStatusBadge" class="text-[10px] text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full inline-block">
+                            준비 완료
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <button id="btnExecute" disabled onclick="executeAIAnalysis()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2">
+            <span id="btnEmoji">✨</span>
+            <span id="btnLabel">사진들을 등록해 주세요</span>
+        </button>
+
+        <div id="errorAlert" class="hidden bg-rose-500/10 border border-rose-500/20 rounded-xl p-3.5 flex items-start gap-2.5 text-rose-300">
+            <span class="text-base leading-none">⚠️</span>
+            <div class="text-xs leading-relaxed flex-1">
+                <h4 class="font-bold text-rose-200">안내 사항</h4>
+                <p id="errorMsg" class="mt-0.5">내용</p>
+            </div>
+            <button onclick="dismissAlert()" class="text-rose-400 text-xs px-2 py-0.5 bg-rose-500/15 rounded-md hover:text-rose-200">닫기</button>
+        </div>
+
+        <div id="loadingOverlay" class="hidden fixed inset-0 bg-slate-950/95 backdrop-blur-xs z-50 flex items-center justify-center p-6">
+            <div class="text-center space-y-5 max-w-xs">
+                <div class="relative w-16 h-16 mx-auto">
+                    <div class="absolute inset-0 rounded-full border-4 border-slate-800"></div>
+                    <div class="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" id="loaderSpinner"></div>
+                    <div class="absolute inset-0 flex items-center justify-center text-xl" id="loaderEmoji">😎</div>
+                </div>
+                <div class="space-y-2">
+                    <h3 class="font-extrabold text-white text-base leading-normal break-keep" id="loaderTitle">
+                        태웅 AI가 개꿀 빨기 위해 사진을 인식 중입니다.
+                    </h3>
+                    <p class="text-[11px] text-slate-400 leading-normal" id="loaderDesc">
+                        동시에 여러 날짜의 계획을 폭풍 흡입하여 각각 가공하는 기적을 행하는 중...✨
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <section id="resultSection" class="hidden flex flex-col gap-5 scroll-mt-24">
+            <div class="flex justify-between items-center px-1">
+                <h3 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span>📝</span> 일자별 자동 완성 결과지
+                </h3>
+                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold px-2 py-0.5 rounded-md">분석 완료</span>
+            </div>
+
+            <p class="text-[10px] text-yellow-400 bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-3 leading-relaxed">
+                💡 아래 생성된 카드 메모장은 날짜별로 각각 <strong>직접 지우거나 타이핑하여 수정이 가능</strong>합니다. 수정한 후 각각의 복사 버튼을 터치해 간편히 사용하세요!
+            </p>
+
+            <div id="dynamicReportContainer" class="flex flex-col gap-4">
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="w-full max-w-md mt-12 text-center text-[10px] text-slate-500 space-y-1">
+        <p>파주문산복합 발전운영계획 멀티 스마트 자동 가공기</p>
+        <p class="font-mono">Created by 👑 김태웅. All Rights Reserved.</p>
+    </footer>
+
+    <div id="toastNotification" class="hidden fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 px-5 py-3 rounded-full text-xs font-semibold text-white shadow-2xl z-50 flex items-center gap-2 whitespace-nowrap">
+        <span class="text-emerald-400">✓</span>
+        <span id="toastMsg">알림 메시지</span>
+    </div>
+
+    <script>
+        // 캔버스 환경 및 기본 API 세팅
+        const fallbackApiKey = ""; 
+
+        let originalFiles = [];
+        let rawImagesBase64 = [];
+        let cooldownInterval = null;
+
+        // 페이지 로드 시 저장된 API 키 불러오기
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedKey = localStorage.getItem('gemini_api_key_tw');
+            if (savedKey) {
+                document.getElementById('apiKeyInput').value = savedKey;
+            }
+        });
+
+        // API 키 로컬 스토리지 저장 기능
+        function saveApiKey() {
+            const inputKey = document.getElementById('apiKeyInput').value.trim();
+            if (inputKey) {
+                localStorage.setItem('gemini_api_key_tw', inputKey);
+                triggerToast("API 키가 기기에 안전하게 저장되었습니다.");
+            } else {
+                localStorage.removeItem('gemini_api_key_tw');
+                triggerToast("저장된 API 키가 삭제되었습니다.");
+            }
+        }
+
+        // 실행 시 사용할 API 키 획득
+        function getActiveApiKey() {
+            const inputKey = document.getElementById('apiKeyInput').value.trim();
+            return inputKey || fallbackApiKey;
+        }
+
+        function displayAlert(msg) {
+            const alertBox = document.getElementById('errorAlert');
+            document.getElementById('errorMsg').innerText = msg;
+            alertBox.classList.remove('hidden');
+        }
+        function dismissAlert() {
+            document.getElementById('errorAlert').classList.add('hidden');
+        }
+        function triggerToast(message) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastMsg').innerText = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2500);
+        }
+
+        // 압축 없이 100% 무손실 원본 추출 (인식 오류 원천 차단)
+        async function readDirectlyAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function processMultipleFiles(files) {
+            dismissAlert();
+            if (files.length === 0) return;
+
+            if (files.length < 2) {
+                displayAlert("분석을 하려면 최소 2장 이상의 사진(하루전 1장, 신뢰도 1장 등 세트 구성)을 선택해 주셔야 합니다.");
+                resetUploadArea();
+                return;
+            }
+
+            originalFiles = Array.from(files);
+            const count = files.length;
+            document.getElementById('fileCountBadge').innerText = `${count}장 선택됨`;
+
+            const previewGrid = document.getElementById('previewGrid');
+            previewGrid.innerHTML = '';
+            document.getElementById('uploadPrompt').classList.add('hidden');
+            document.getElementById('previewArea').classList.remove('hidden');
+
+            document.getElementById('loaderTitle').innerText = "태웅 AI 무손실 원본 스캔 준비 중";
+            document.getElementById('loaderDesc').innerText = "글자가 깨지지 않도록 원본 해상도 그대로 픽셀 데이터를 불러오고 있습니다.";
+            toggleLoadingMask(true);
+
+            rawImagesBase64 = [];
+
+            try {
+                const fileReadPromises = originalFiles.map(async (file, idx) => {
+                    const rawBase64 = await readDirectlyAsBase64(file);
+                    const thumbUrl = `data:image/jpeg;base64,${rawBase64}`;
+                    const thumbCol = document.createElement('div');
+                    thumbCol.className = "relative aspect-[4/3] rounded-lg overflow-hidden border border-white/5 bg-slate-950";
+                    thumbCol.innerHTML = `
+                        <img src="${thumbUrl}" class="w-full h-full object-cover">
+                        <span class="absolute bottom-1 right-1 bg-black/70 text-[7px] text-slate-300 px-1 rounded font-mono">P${idx+1}</span>
+                    `;
+                    previewGrid.appendChild(thumbCol);
+                    return rawBase64;
+                });
+
+                rawImagesBase64 = await Promise.all(fileReadPromises);
+                const estimatedDays = Math.floor(count / 2);
+                document.getElementById('previewStatusBadge').innerText = `✓ ${count}장 인식 성공 (${estimatedDays}일 분량 추정)`;
+
+                const btn = document.getElementById('btnExecute');
+                btn.disabled = false;
+                document.getElementById('btnEmoji').innerText = "🚀";
+                document.getElementById('btnLabel').innerText = "AI 멀티 발전계획 분석 시작";
+
+            } catch (err) {
+                console.error(err);
+                displayAlert("다중 이미지 원본 변환 중 문제가 발생했습니다.");
+            } finally {
+                toggleLoadingMask(false);
+            }
+        }
+
+        function resetUploadArea() {
+            document.getElementById('multiFileInput').value = "";
+            rawImagesBase64 = [];
+            originalFiles = [];
+            document.getElementById('uploadPrompt').classList.remove('hidden');
+            document.getElementById('previewArea').classList.add('hidden');
+            document.getElementById('previewGrid').innerHTML = '';
+            document.getElementById('fileCountBadge').innerText = "0장 선택됨";
+            
+            const btn = document.getElementById('btnExecute');
+            btn.disabled = true;
+            document.getElementById('btnEmoji').innerText = "✨";
+            document.getElementById('btnLabel').innerText = "사진을 먼저 등록해 주세요";
+        }
+
+        function toggleLoadingMask(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (show) {
+                overlay.classList.remove('hidden');
+                document.getElementById('loaderSpinner').classList.add('animate-spin');
+                document.getElementById('loaderEmoji').innerText = "😎";
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function startQuotaCooldown(secondsLeft) {
+            document.getElementById('loaderSpinner').classList.remove('animate-spin');
+            document.getElementById('loaderEmoji').innerText = "🤫";
+            document.getElementById('loaderTitle').innerText = "⚠️ 구글한테 개꿀 빠는 걸 들켰습니다!";
+            
+            if (cooldownInterval) clearInterval(cooldownInterval);
+
+            const updateTimer = () => {
+                if (secondsLeft <= 0) {
+                    clearInterval(cooldownInterval);
+                    document.getElementById('loaderTitle').innerText = "태웅 AI가 개꿀 빨기 위해 사진을 인식 중입니다.";
+                    document.getElementById('loaderDesc').innerText = "동시에 여러 날짜의 계획을 폭풍 흡입하여 각각 가공하는 기적을 행하는 중...✨";
+                    document.getElementById('loaderSpinner').classList.add('animate-spin');
+                    document.getElementById('loaderEmoji').innerText = "😎";
+                    executeAIAnalysis();
+                } else {
+                    document.getElementById('loaderDesc').innerHTML = `
+                        구글 무료 API 서버가 일시적으로 제한되었습니다.<br>
+                        <span class="text-yellow-400 font-extrabold text-base font-mono">${secondsLeft}초</span> 후 마법같이 자동으로 재시도합니다!
+                    `;
+                    secondsLeft--;
+                }
+            };
+
+            updateTimer();
+            cooldownInterval = setInterval(updateTimer, 1000);
+        }
+
+        async function executeAIAnalysis() {
+            const activeKey = getActiveApiKey();
+            if (!activeKey) {
+                displayAlert("API 키가 입력되지 않았습니다. 상단 입력칸에 키를 넣고 저장 버튼을 눌러주세요.");
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+
+            if (rawImagesBase64.length === 0) {
+                displayAlert("분석할 사진 파일들이 세팅되지 않았습니다.");
+                return;
+            }
+
+            dismissAlert();
+            toggleLoadingMask(true);
+
+            // [핵심] 형님의 피드백을 반영하여 시간 변환식과 합계 제외, 양식 일관성을 절대 룰로 강제하는 프롬프트
+            const prompt = `
+당신은 발전소 운영 데이터를 완벽하게 식별하고 가공하는 수석 엔지니어입니다.
+이미지들은 파주문산복합 발전소의 '하루전발전계획' 및 '신뢰도발전계획' 표 모니터링 화면입니다.
+
+[★ 절대 복종해야 할 3대 규칙 ★]
+
+1. '합계' 행 완전 무시 필터링:
+   - 표 맨 윗줄의 "합계" 행(노란색 또는 주황색 배경)은 하루 전체 24시간 누계 수치입니다.
+   - 이 행의 숫자가 무엇이든 0이든 아니든 **절대 분석하지 마십시오.** - 오직 세로축에 "01시", "02시" ... "24시" 라고 명시된 24개의 시간 행 데이터만 판독하십시오.
+
+2. 시간 범위 계산 공식 (1시는 0시~1시를 의미함):
+   - 발전계획 상의 세로축 'N시'는 '(N-1):00 ~ N:00'을 의미합니다.
+   - 예시: "01시" = "00:00~01:00", "04시" = "03:00~04:00", "11시" = "10:00~11:00", "24시" = "23:00~24:00"
+   - 수치가 "0"인 연속된 시간을 찾아 하나로 병합하십시오.
+     (예: 01시, 02시, 03시, 04시가 0이면 -> "00:00~04:00" 하나로 출력)
+
+3. 100% 일관된 텍스트 양식 유지:
+   - 각 기기(#1CC, #2CC)의 미할당/정지 구간을 판독합니다.
+   - 1CC와 2CC의 결과가 완벽히 똑같으면 무조건 하나로 합쳐서 한 줄로 표기합니다.
+     (예: "- #1,2CC 미할당 (00:00~24:00)" 또는 "- #1,2CC 정지계획 없음")
+   - [하루전발전계획]에서 값이 0인 구간이 아예 없으면: "- #1CC 미할당 없음" (또는 #1,2CC 미할당 없음)
+   - [신뢰도발전계획]에서 값이 0인 구간이 아예 없으면: "- #1CC 정지계획 없음"
+   - [신뢰도발전계획]에서 값이 0인 구간이 1시간이라도 있으면: "- #1CC 정지 (시간범위)"
+
+[기본 절차]
+- 거래일 요일 파악하여 타이틀 작성 (주말/연휴/명일 운영계획)
+- JSON 형식으로만 결과 출력
+
+[JSON 출력 형식 규칙]
+반드시 다음 구조의 JSON 포맷으로만 응답해야 하며, 그 외의 텍스트, 마크다운( \`\`\` ) 블록 표기를 절대 생략하고 오직 JSON 데이터만 리턴하십시오.
+
+{
+  "reports": [
+    {
+      "date": "M/D(요일) (예: 5/7(목))",
+      "planType": "연휴 운영계획",
+      "content": "파주문산복합 연휴 운영계획\\n- 5/7(목)\\n■ 하루전발전계획\\n- #1CC 미할당 (00:00~04:00)\\n- #2CC 미할당 없음\\n■ 신뢰도발전계획\\n- #1CC 정지 (00:00~04:00)\\n- #2CC 정지계획 없음"
+    }
+  ]
+}
+`;
+
+            const imageParts = rawImagesBase64.map(base64 => ({
+                inlineData: { mimeType: "image/jpeg", data: base64 }
+            }));
+
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        ...imageParts
+                    ]
+                }],
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
+            };
+
+            // 플랫폼 내부 실행인지 사용자가 깃허브에서 가져온 건지 판단하여 최적의 모델명 바인딩
+            const modelName = fallbackApiKey !== "" && activeKey === fallbackApiKey 
+                ? 'gemini-2.5-flash-preview-09-2025' 
+                : 'gemini-2.5-flash';
+            
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${activeKey}`;
+            const maxRetries = 3;
+            let retryDelay = 1500;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429) {
+                        startQuotaCooldown(35);
+                        return;
+                    }
+
+                    if (response.status === 400 && attempt === 1) {
+                        toggleLoadingMask(false);
+                        displayAlert("입력하신 API 키가 유효하지 않습니다. 키를 다시 확인해 주세요.");
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        const errBody = await response.json().catch(() => ({}));
+                        const errMsg = errBody.error?.message || `응답 오류 (코드: ${response.status})`;
+                        
+                        if (errMsg.toLowerCase().includes("quota") || errMsg.includes("429")) {
+                            startQuotaCooldown(35);
+                            return;
+                        }
+                        throw new Error(errMsg);
+                    }
+
+                    const resJson = await response.json();
+                    
+                    let aiRawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!aiRawText) throw new Error("분석 결과를 텍스트로 받아오는 데 실패했습니다.");
+                    
+                    aiRawText = aiRawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const aiResultData = JSON.parse(aiRawText);
+                    
+                    if (!aiResultData || !aiResultData.reports || aiResultData.reports.length === 0) {
+                        throw new Error("올바른 발전계획 분석 구조를 생성하지 못했습니다.");
+                    }
+
+                    renderDynamicReportCards(aiResultData.reports);
+
+                    toggleLoadingMask(false);
+                    triggerToast("모든 날짜 분석 및 개별 가공에 성공했습니다!");
+                    return;
+
+                } catch (error) {
+                    const errStr = error.message || "";
+                    if (errStr.toLowerCase().includes("quota") || errStr.includes("429") || errStr.toLowerCase().includes("limit")) {
+                        startQuotaCooldown(35);
+                        return;
+                    }
+
+                    if (attempt === maxRetries) {
+                        toggleLoadingMask(false);
+                        displayAlert(`에러가 발생했습니다: ${error.message}. 다시 실행해 주시거나 사진에 글자가 명확히 보이는지 체크해 주세요.`);
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay *= 2;
+                }
+            }
+        }
+
+        function renderDynamicReportCards(reports) {
+            const container = document.getElementById('dynamicReportContainer');
+            container.innerHTML = ''; 
+
+            reports.forEach((report, index) => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = "bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3.5 scroll-mt-24";
+                
+                cardDiv.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-white/5 pb-2">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm">📅</span>
+                            <h4 class="text-xs font-bold text-blue-400 font-mono">${report.date} 결과</h4>
+                        </div>
+                        <span class="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">수정 가능</span>
+                    </div>
+
+                    <div class="relative">
+                        <textarea id="resultContainer_${index}" class="w-full h-44 bg-slate-950/90 text-slate-100 font-mono text-xs p-3.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500/30 resize-none leading-relaxed border border-white/5 shadow-inner">${report.content}</textarea>
+                    </div>
+
+                    <button onclick="copyIndividualOutput(${index})" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-slate-950 font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs shadow-md shadow-emerald-950/20">
+                        <span>📋</span>
+                        <span>${report.date} 내용 복사</span>
+                    </button>
+                `;
+                container.appendChild(cardDiv);
+            });
+
+            const resultSection = document.getElementById('resultSection');
+            resultSection.classList.remove('hidden');
+            
+            setTimeout(() => {
+                resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+
+        function copyIndividualOutput(index) {
+            const textarea = document.getElementById(`resultContainer_${index}`);
+            if (!textarea) return;
+
+            const tempInput = document.createElement('textarea');
+            tempInput.value = textarea.value;
+            tempInput.style.position = 'fixed';
+            tempInput.style.left = '-9999px';
+            document.body.appendChild(tempInput);
+            
+            tempInput.select();
+            tempInput.setSelectionRange(0, 99999);
+
+            try {
+                if (document.execCommand('copy')) {
+                    triggerToast("해당 날짜 복사 성공! 카톡방에 붙여넣기하세요.");
+                } else {
+                    throw new Error("복사 기능 제한");
+                }
+            } catch (err) {
+                triggerToast("복사 실패. 메모장 안을 길게 터치하여 직접 전체 복사해 주세요.");
+            } finally {
+                document.body.removeChild(tempInput);
+            }
+        }
+    </script>
+</body>
+</html>
+
+
